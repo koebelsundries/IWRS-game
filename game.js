@@ -1405,7 +1405,13 @@
     };
   }
 
-  loadImage("assets/sprites.png").then(function (im) {
+  loadImage("assets/sprites-v4.png").then(function (im) {
+    // Guard: if a stale cached sheet is smaller than the frame map needs, reload fresh.
+    var need = 0, fr = (window.IWRS_SPRITES || {}).frames || {};
+    Object.keys(fr).forEach(function (k) { need = Math.max(need, fr[k].y + fr[k].h); });
+    if (im.height < need) {
+      return loadImage("assets/sprites-v4.png?r=" + Date.now()).then(function (im2) { sheet = im2; boot(); });
+    }
     sheet = im;
     boot();
   }).catch(function (err) {

@@ -1,13 +1,13 @@
 /* IWRS - offline cache. Scope: this game's root only. */
-const CACHE = "iwrs-v3";
+const CACHE = "iwrs-v4";
 const CORE = [
   "./",
   "./index.html",
   "./style.css",
   "./game.js",
   "./manifest.webmanifest",
-  "./assets/sprites.js",
-  "./assets/sprites.png",
+  "./assets/sprites-v4.js",
+  "./assets/sprites-v4.png",
   "./fonts/PressStart2P-Regular.ttf",
   "./icons/favicon-32.png",
   "./icons/favicon.ico",
