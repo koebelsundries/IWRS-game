@@ -1,0 +1,25 @@
+IWRS (Injured Wildlife Rescue Service) — credits
+================================================
+
+Player and animal sprites
+  Drawn by Donny for this game (girl and boy walk cycles, tabby cat,
+  tuxedo cat). Sliced from the supplied strips, downscaled with an
+  alpha-aware box filter, and packed into assets/sprites.png
+  (map: assets/sprites.json and assets/sprites.js).
+
+Forest tiles, trees, bushes, rocks, flowers, the ravine and bridge
+  Original procedural pixel art drawn in the game (no third-party kits).
+
+Icon
+  The sitting tabby from Donny's sprite strip, placed on a parchment /
+  sage background for the PWA icons in icons/.
+
+Font
+  Press Start 2P by CodeMan38 (cody@zone38.net)
+  SIL Open Font License 1.1 — see fonts/OFL.txt
+  Unmodified copy from https://github.com/google/fonts/tree/main/ofl/pressstart2p
+
+Sound effects and music
+  Synthesised in the browser with WebAudio (no audio files).
+
+No assets from any commercial game were used.

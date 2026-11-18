@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="IWRS" />
+  <meta name="theme-color" content="#2f6a3a" />
+  <meta name="description" content="IWRS — Injured Wildlife Rescue Service. Search the forest for hidden injured animals and bring them home." />
+  <meta name="format-detection" content="telephone=no" />
+  <title>IWRS — Injured Wildlife Rescue Service</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="preload" href="fonts/PressStart2P-Regular.ttf" as="font" type="font/ttf" crossorigin />
+  <link rel="preload" href="assets/sprites.png" as="image" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" href="icons/favicon.ico" sizes="48x48" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <div id="hud">
+      <div class="hud-left">
+        <div id="hudCats">Cats 0/4</div>
+        <div id="hudListen"><div id="hudListenBar"></div></div>
+        <div id="hudListenLbl"></div>
+        <div id="hudTime">0:00</div>
+      </div>
+      <div class="hud-right">
+        <button class="icon-btn" id="homeBtn" type="button" aria-label="Start, pause">🏠</button>
+        <button class="icon-btn" id="muteBtn" type="button" aria-label="Mute">🔊</button>
+      </div>
+    </div>
+    <div id="toast"></div>
+    <div id="prompt"></div>
+
+    <div id="titleScreen" class="screen show">
+      <div class="card">
+        <h1 class="logo">IWRS</h1>
+        <p class="full-name">INJURED WILDLIFE<br>RESCUE SERVICE</p>
+        <p class="tag">Search the woods for hidden kitties and bring them home safe.</p>
+        <button class="gb-btn" id="btnStart" type="button">Press Start</button>
+        <a class="home-link" id="titleHome" href="https://koebelsundries.github.io/kids-games/">🏠 All Games</a>
+        <p class="how">D-pad walk · A rescue · B run</p>
+      </div>
+    </div>
+
+    <div id="selectScreen" class="screen">
+      <div class="card">
+        <h2 class="big">Who's heading out?</h2>
+        <p class="tag">Pick a rescuer, then press A.</p>
+        <div class="choice-row">
+          <button class="choice-btn on" id="pickBoy" type="button" data-who="boy">Boy</button>
+          <button class="choice-btn" id="pickGirl" type="button" data-who="girl">Girl</button>
+        </div>
+        <button class="gb-btn" id="btnConfirm" type="button">A  Let's go!</button>
+        <p class="how">B to go back</p>
+      </div>
+    </div>
+
+    <div id="pauseMenu" class="screen">
+      <div class="card">
+        <div class="big">Paused</div>
+        <p class="pause-sub">Take a break — where to next?</p>
+        <button class="end-btn" id="btnResume" type="button">▶ Keep Playing</button>
+        <button class="end-btn" id="btnGameMenu" type="button">Game Menu</button>
+        <a class="end-btn" id="btnPauseAll" href="https://koebelsundries.github.io/kids-games/" style="text-align:center;text-decoration:none;">🏠 All Games</a>
+      </div>
+    </div>
+
+    <div id="winScreen" class="screen">
+      <div class="card">
+        <div class="big">All kitties rescued!</div>
+        <div class="time-line" id="winTime">Time 0:00</div>
+        <div class="best-line" id="winBest">Best 0:00</div>
+        <p class="tag">They are purring and ready for a nap.</p>
+        <button class="end-btn" id="btnAgain" type="button">Rescue again</button>
+        <button class="end-btn" id="btnWinMenu" type="button">Game Menu</button>
+        <a class="end-btn" id="btnWinAll" href="https://koebelsundries.github.io/kids-games/" style="text-align:center;text-decoration:none;">🏠 All Games</a>
+      </div>
+    </div>
+
+    <div id="controls">
+      <div id="dpad" aria-label="D-pad">
+        <div class="well"></div>
+        <div class="cross">
+          <div class="arm arm-h"></div>
+          <div class="arm arm-v"></div>
+          <div class="cap"></div>
+          <div class="nub u"></div>
+          <div class="nub d"></div>
+          <div class="nub l"></div>
+          <div class="nub r"></div>
+        </div>
+      </div>
+      <button id="btnB" type="button" aria-label="B, run">B<span class="btn-sub">RUN</span></button>
+      <button id="btnA" type="button" aria-label="A, rescue">A<span class="btn-sub">RESCUE</span></button>
+    </div>
+    <div id="keysHint">Arrows or WASD move · Z / Space rescue · X / Shift run · Enter / Esc pause</div>
+  </div>
+
+  <script src="assets/sprites.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
