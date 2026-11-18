@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const VW = 256, VH = 160, TILE = 16;
+  let VW = 256, VH = 160;
+  const TILE = 16;
+  const MIN_SHORT = 160; // target logical px on the short side
   const COLS = 52, ROWS = 40;
   const WORLD_W = COLS * TILE, WORLD_H = ROWS * TILE;
   const T_GRASS = 0, T_PATH = 1, T_WATER = 2, T_CLIFF = 3, T_LIP_N = 4, T_LIP_S = 5, T_BRIDGE = 6;
@@ -968,6 +970,8 @@
     player.run = run && player.walking;
     if (player.walking) {
       tryMove(player, mx * speed * dt, my * speed * dt);
+      // Source convention after packing: unflipped frames face RIGHT.
+      // Keep last horizontal facing when moving only up/down.
       if (mx < 0) player.flip = 1;
       if (mx > 0) player.flip = 0;
       player.anim += dt * (run ? 12 : 8);
@@ -1241,17 +1245,38 @@
     cam.x = savedX; cam.y = savedY;
   }
 
+  function viewBox() {
+    const vv = window.visualViewport;
+    if (vv && vv.width && vv.height) {
+      return {
+        w: Math.max(1, Math.round(vv.width)),
+        h: Math.max(1, Math.round(vv.height)),
+        x: Math.round(vv.offsetLeft || 0),
+        y: Math.round(vv.offsetTop || 0)
+      };
+    }
+    return { w: window.innerWidth, h: window.innerHeight, x: 0, y: 0 };
+  }
+
   function layout() {
-    const w = window.innerWidth, h = window.innerHeight;
-    scale = Math.max(1, Math.floor(Math.min(w / VW, h / VH)));
+    const v = viewBox();
+    const short = Math.min(v.w, v.h);
+    scale = Math.max(1, Math.floor(short / MIN_SHORT));
+    VW = Math.max(160, Math.ceil(v.w / scale));
+    VH = Math.max(144, Math.ceil(v.h / scale));
+    if (VW % 2) VW++;
+    if (VH % 2) VH++;
     canvas.width = VW;
     canvas.height = VH;
-    const sw = VW * scale, sh = VH * scale;
-    canvas.style.width = sw + "px";
-    canvas.style.height = sh + "px";
-    canvas.style.left = Math.floor((w - sw) / 2) + "px";
-    canvas.style.top = Math.floor((h - sh) / 2) + "px";
+    // Fill the visual viewport; any leftover sub-pixel is a tiny near-integer stretch
+    // (less than one logical pixel) and stays crisp with image-rendering: pixelated.
+    canvas.style.width = v.w + "px";
+    canvas.style.height = v.h + "px";
+    canvas.style.left = v.x + "px";
+    canvas.style.top = v.y + "px";
     ctx.imageSmoothingEnabled = false;
+    cam.x = clamp(cam.x, 0, Math.max(0, WORLD_W - VW));
+    cam.y = clamp(cam.y, 0, Math.max(0, WORLD_H - VH));
   }
 
   let bWas = false;
@@ -1309,6 +1334,11 @@
     anims = data.anims;
     layout();
     window.addEventListener("resize", layout);
+    window.addEventListener("orientationchange", function () { setTimeout(layout, 80); });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", layout);
+      window.visualViewport.addEventListener("scroll", layout);
+    }
     bindInput();
     wireUI();
 
@@ -1333,6 +1363,7 @@
     window.__IWRS = {
       get mode() { return mode; },
       get player() { return player; },
+      get view() { return { vw: VW, vh: VH, scale: scale }; },
       get cats() { return cats; },
       get rescued() { return rescuedCount; },
       choose: function (w) { whoPick = w === "girl" ? "girl" : "boy"; syncPick(); },
