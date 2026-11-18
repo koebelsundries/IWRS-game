@@ -185,14 +185,21 @@
       }
       art.bridge = c;
     })();
+    // Side railing for a north-south crossing: posts and rails run vertically
+    // along the left/right edges. (Planks on the deck already run horizontally,
+    // stacked north-south, perpendicular to travel.)
     (function () {
-      const { c, g } = mk(16, 14);
-      fill(g, 1, 2, 3, 12, "#6a3e1c");
-      fill(g, 12, 2, 3, 12, "#6a3e1c");
-      fill(g, 0, 3, 16, 3, "#b07a40");
-      fill(g, 0, 2, 16, 1, "#d4a060");
-      fill(g, 0, 6, 16, 1, "#4a2c16");
-      fill(g, 2, 2, 1, 12, "#c09050");
+      const { c, g } = mk(8, 16);
+      fill(g, 2, 0, 4, 4, "#6a3e1c");
+      fill(g, 3, 0, 1, 4, "#c09050");
+      fill(g, 2, 12, 4, 4, "#5a3218");
+      fill(g, 3, 12, 1, 4, "#c09050");
+      fill(g, 1, 1, 2, 14, "#b07a40");
+      fill(g, 2, 1, 1, 14, "#d4a060");
+      fill(g, 5, 2, 2, 13, "#8a5a2e");
+      fill(g, 5, 2, 1, 13, "#c09050");
+      fill(g, 0, 3, 1, 2, "#4a2c16");
+      fill(g, 7, 10, 1, 2, "#4a2c16");
       art.rail = c;
     })();
 
@@ -484,9 +491,19 @@
 
     addProp("log", art.log, 34 * TILE + 8, 27 * TILE + 10, true);
 
-    for (let c = BRIDGE_C0; c <= BRIDGE_C1; c++) {
-      props.push({ kind: "rail", x: c * TILE + 8, y: RAV_TOP * TILE + 6, img: { c: art.rail, ax: 8, ay: 12 }, z: RAV_TOP * TILE + 6 });
-      props.push({ kind: "rail", x: c * TILE + 8, y: RAV_BOT * TILE + 14, img: { c: art.rail, ax: 8, ay: 12 }, z: RAV_BOT * TILE + 14 });
+    // Rails along the LEFT and RIGHT edges, parallel to north-south travel.
+    // The north and south ends stay open where the path meets the deck.
+    const railW = 6;
+    const bridgeTop = RAV_TOP * TILE;
+    const bridgeH = (RAV_BOT - RAV_TOP + 1) * TILE;
+    const leftX = BRIDGE_C0 * TILE;
+    const rightX = (BRIDGE_C1 + 1) * TILE;
+    solids.push({ x: leftX, y: bridgeTop, w: railW, h: bridgeH });
+    solids.push({ x: rightX - railW, y: bridgeTop, w: railW, h: bridgeH });
+    for (let r = RAV_TOP; r <= RAV_BOT; r++) {
+      const y = (r + 1) * TILE;
+      props.push({ kind: "rail", x: leftX + 4, y: y, img: { c: art.rail, ax: 4, ay: 16 }, z: y });
+      props.push({ kind: "rail", x: rightX - 4, y: y, img: { c: art.rail, ax: 4, ay: 16 }, z: y });
     }
 
     props.forEach(function (p) { if (!p.z) p.z = p.y; });
