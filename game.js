@@ -745,8 +745,9 @@
   function makePlayer(kind) {
     player = {
       kind: kind, x: START.x, y: START.y,
-      flip: 0, walking: false, run: false,
-      anim: 0, stepAcc: 0, frame: anims[kind].idle
+      flip: 0, drawFlip: 0, facing: "down",
+      walking: false, run: false,
+      anim: 0, stepAcc: 0, frame: anims[kind].idleDown || anims[kind].idle
     };
     cam.x = clamp(player.x - VW / 2, 0, WORLD_W - VW);
     cam.y = clamp(player.y - VH / 2, 0, WORLD_H - VH);
@@ -956,6 +957,21 @@
   }
 
 
+  function poseFor(kind, facing, walking, anim) {
+    const A = anims[kind];
+    if (facing === "up") {
+      const seq = walking ? (A.walkUp || A.walk) : [A.idleUp || A.idle];
+      return { frame: seq[Math.floor(anim) % seq.length], flip: 0, set: walking ? "walkUp" : "idleUp" };
+    }
+    if (facing === "down") {
+      const seq = walking ? (A.walkDown || A.walk) : [A.idleDown || A.idle];
+      return { frame: seq[Math.floor(anim) % seq.length], flip: 0, set: walking ? "walkDown" : "idleDown" };
+    }
+    const seq = walking ? A.walk : [A.idle];
+    const flip = facing === "left" ? 1 : 0;
+    return { frame: seq[Math.floor(anim) % seq.length], flip: flip, set: walking ? "walk" : "idle" };
+  }
+
   function updatePlay(dt) {
     elapsed = (performance.now() - startTime) / 1000;
     $("hudTime").textContent = formatTime(elapsed);
@@ -970,13 +986,20 @@
     player.run = run && player.walking;
     if (player.walking) {
       tryMove(player, mx * speed * dt, my * speed * dt);
-      // Source convention after packing: unflipped frames face RIGHT.
-      // Keep last horizontal facing when moving only up/down.
-      if (mx < 0) player.flip = 1;
-      if (mx > 0) player.flip = 0;
+      // Pick a 4-direction facing. Diagonals prefer the horizontal axis
+      // when |mx| >= |my|; otherwise the dominant axis wins.
+      const ax = Math.abs(mx), ay = Math.abs(my);
+      if (ax >= ay && ax > 0) {
+        player.facing = mx < 0 ? "left" : "right";
+        // Source convention: unflipped side frames face RIGHT.
+        player.flip = mx < 0 ? 1 : 0;
+      } else if (ay > 0) {
+        player.facing = my < 0 ? "up" : "down";
+      }
       player.anim += dt * (run ? 12 : 8);
-      const walk = anims[player.kind].walk;
-      player.frame = walk[Math.floor(player.anim) % walk.length];
+      const pose = poseFor(player.kind, player.facing, true, player.anim);
+      player.frame = pose.frame;
+      player.drawFlip = pose.flip;
       player.stepAcc += dt * (run ? 5.5 : 3.6);
       if (player.stepAcc >= 1) { player.stepAcc -= 1; Sfx.foot(run); }
       const last = trail[trail.length - 1];
@@ -985,7 +1008,9 @@
         if (trail.length > 80) trail.shift();
       }
     } else {
-      player.frame = anims[player.kind].idle;
+      const pose = poseFor(player.kind, player.facing || "down", false, 0);
+      player.frame = pose.frame;
+      player.drawFlip = pose.flip;
       player.anim = 0;
     }
 
@@ -1161,7 +1186,7 @@
     drawList.forEach(function (item) {
       if (item.kind === "player") {
         shadow(player.x, player.y, 7, 3);
-        drawSpr(player.frame, player.x, player.y, player.flip, 0);
+        drawSpr(player.frame, player.x, player.y, player.drawFlip, 0);
       } else if (item.kind === "cat") {
         const cat = item.cat;
         shadow(cat.x, cat.y, 6, 2.5);
@@ -1176,8 +1201,9 @@
           }
         }
       } else if (item.kind === "preview") {
-        const idle = anims[item.who].idle;
-        const walk = anims[item.who].walk;
+        const A = anims[item.who];
+        const walk = A.walkDown || A.walk;
+        const idle = A.idleDown || A.idle;
         const use = (item.who === whoPick) ? walk[Math.floor(previewT * 8) % walk.length] : idle;
         shadow(item.x, item.y, 7, 3);
         if (item.who === whoPick) {
@@ -1364,6 +1390,8 @@
       get mode() { return mode; },
       get player() { return player; },
       get view() { return { vw: VW, vh: VH, scale: scale }; },
+      get facing() { return player && player.facing; },
+      get animSet() { return player && poseFor(player.kind, player.facing || "down", !!player.walking, player.anim).set; },
       get cats() { return cats; },
       get rescued() { return rescuedCount; },
       choose: function (w) { whoPick = w === "girl" ? "girl" : "boy"; syncPick(); },

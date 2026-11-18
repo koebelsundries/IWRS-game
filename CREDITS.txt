@@ -7,6 +7,12 @@ Player and animal sprites
   alpha-aware box filter, and packed into assets/sprites.png
   (map: assets/sprites.json and assets/sprites.js).
 
+Front and back walk cycles (walk down / walk up)
+  Generated to match Donny's boy and girl side-view art (same outfits,
+  colors, hair, backpack and boots), then background-removed, sliced,
+  and downscaled into assets/sprites.png with the existing side frames.
+
+
 Forest tiles, trees, bushes, rocks, flowers, the ravine and bridge
   Original procedural pixel art drawn in the game (no third-party kits).
 

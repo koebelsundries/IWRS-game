@@ -1,5 +1,5 @@
 /* IWRS - offline cache. Scope: this game's root only. */
-const CACHE = "iwrs-v2";
+const CACHE = "iwrs-v3";
 const CORE = [
   "./",
   "./index.html",
