@@ -2,7 +2,7 @@
   "id": "./",
   "name": "IWRS",
   "short_name": "IWRS",
-  "description": "Injured Wildlife Rescue Service — search the forest for hidden injured animals and bring them home.",
+  "description": "Injured Wildlife Rescue Squad — search the forest for hidden injured animals and bring them home.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
