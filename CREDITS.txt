@@ -17,8 +17,8 @@ Forest tiles, trees, bushes, rocks, flowers, the ravine and bridge
   Original procedural pixel art drawn in the game (no third-party kits).
 
 Icon
-  The sitting tabby from Donny's sprite strip, placed on a parchment /
-  sage background for the PWA icons in icons/.
+  Pixel-art heart (dark green with a coral center and cream outlines)
+  drawn by Donny, placed on a cream background for the PWA icons in icons/.
 
 Font
   Press Start 2P by CodeMan38 (cody@zone38.net)

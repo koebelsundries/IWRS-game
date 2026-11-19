@@ -1,5 +1,5 @@
 /* IWRS - offline cache. Scope: this game's root only. */
-const CACHE = "iwrs-v8";
+const CACHE = "iwrs-v9";
 const CORE = [
   "./",
   "./index.html",
@@ -9,12 +9,12 @@ const CORE = [
   "./assets/sprites-v4.js",
   "./assets/sprites-v4.png",
   "./fonts/PressStart2P-Regular.ttf",
-  "./icons/favicon-32.png",
-  "./icons/favicon.ico",
-  "./icons/apple-touch-icon.png",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/maskable-512.png"
+  "./icons/favicon-32-v9.png",
+  "./icons/favicon-v9.ico",
+  "./icons/apple-touch-icon-v9.png",
+  "./icons/icon-192-v9.png",
+  "./icons/icon-512-v9.png",
+  "./icons/maskable-512-v9.png"
 ];
 
 self.addEventListener("install", function (e) {
