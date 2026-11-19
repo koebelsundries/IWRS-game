@@ -32,7 +32,7 @@ canvas#c {
   -ms-interpolation-mode: nearest-neighbor;
 }
 #ui { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
-#ui button, #ui a, #ui .hit { pointer-events: auto; }
+#ui button, #ui a, #ui .hit { pointer-events: auto; touch-action: manipulation; }
 button {
   font-family: inherit; border: 0; cursor: pointer;
   color: var(--cream);
@@ -51,7 +51,7 @@ a { color: var(--gold); text-decoration: none; }
   text-align: center;
   pointer-events: none;
 }
-.screen.show { display: flex; }
+.screen.show { display: flex; z-index: 6; pointer-events: auto; }
 .card {
   pointer-events: auto;
   background: rgba(15, 36, 22, 0.88);
@@ -119,6 +119,7 @@ a { color: var(--gold); text-decoration: none; }
 
 #hud {
   position: absolute; top: 0; left: 0; right: 0;
+  z-index: 8;
   padding: calc(8px + var(--safe-t)) 10px 0;
   display: none;
   align-items: flex-start;
@@ -306,3 +307,8 @@ body.desktop #controls.show #btnB { opacity: 0.28; }
 #btnNextLevel { background: #c9a227; color: #1a2a10; box-shadow: inset 0 2px 0 #ffe28a, 3px 3px 0 #0a1a0e; }
 #btnNextLevel:hover { background: #d4b338; }
 .hidden { display: none !important; }
+
+.end-btn.on {
+  outline: 3px solid #fff6b0;
+  outline-offset: 3px;
+}

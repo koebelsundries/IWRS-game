@@ -1127,9 +1127,16 @@
       if (e.repeat && (e.key === "Enter" || e.key === "Escape" || e.key === "z" || e.key === "Z" || e.key === " ")) return;
       const m = keyMove[e.key];
       if (m) {
-        if (m[0]) input.kx = m[0];
-        if (m[1]) input.ky = m[1];
-        e.preventDefault();
+        if (mode === "win" && m[1]) {
+          winChoice += m[1];
+          syncWinChoice();
+          Sfx.blip();
+          e.preventDefault();
+        } else {
+          if (m[0]) input.kx = m[0];
+          if (m[1]) input.ky = m[1];
+          e.preventDefault();
+        }
       }
       if (e.key === "z" || e.key === "Z" || e.key === " ") {
         if (!input.keysA) input.aEdge = true;
@@ -1404,6 +1411,63 @@
     $("winScreen").classList.add("show");
     Sfx.win();
     if (player) burst(player.x, player.y - 8);
+    winChoice = 0;
+    syncWinChoice();
+  }
+
+  // After Level 1, the primary win action is Next Level. A/Start/keyboard
+  // used to call startPlay() with levelPick still 1, which replayed Level 1
+  // and made the highlighted "Next Level" button feel broken. Pointerup is
+  // also bound because some mobile browsers (touch-action: none on body)
+  // do not always synthesize a click from a tap.
+  let winChoice = 0;
+  function winButtons() {
+    const ids = [];
+    if (!$("btnNextLevel").classList.contains("hidden")) ids.push("btnNextLevel");
+    ids.push("btnAgain", "btnWinMenu", "btnWinAll");
+    return ids.map(function (id) { return $(id); }).filter(Boolean);
+  }
+  function syncWinChoice() {
+    const btns = winButtons();
+    if (!btns.length) return;
+    if (winChoice < 0) winChoice = btns.length - 1;
+    if (winChoice >= btns.length) winChoice = 0;
+    btns.forEach(function (b, i) { b.classList.toggle("on", i === winChoice); });
+  }
+  function goNextLevel() {
+    if (mode !== "win") return;
+    Sfx.unlock();
+    if (levelId !== 1) { startPlay(whoPick); return; }
+    levelPick = 2;
+    loadLevel(2);
+    startPlay(whoPick);
+  }
+  function activateWinChoice() {
+    if (mode !== "win") return;
+    const btn = winButtons()[winChoice];
+    if (!btn) { goNextLevel(); return; }
+    if (btn.id === "btnNextLevel") goNextLevel();
+    else if (btn.id === "btnAgain") startPlay(whoPick);
+    else if (btn.id === "btnWinMenu") goTitle();
+    else if (btn.id === "btnWinAll") window.location.href = btn.getAttribute("href") || btn.href;
+  }
+  function bindTap(el, fn) {
+    let armed = false;
+    el.addEventListener("pointerdown", function (e) {
+      if (e.button && e.button !== 0) return;
+      armed = true;
+    });
+    el.addEventListener("pointerup", function (e) {
+      if (!armed) return;
+      armed = false;
+      if (e.button && e.button !== 0) return;
+      const r = el.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+      fn(e);
+    });
+    el.addEventListener("click", function (e) {
+      fn(e);
+    });
   }
 
   function onStart() {
@@ -1413,7 +1477,7 @@
     else if (mode === "select") startPlay(whoPick);
     else if (mode === "play") goPause();
     else if (mode === "pause") resumePlay();
-    else if (mode === "win") startPlay(whoPick);
+    else if (mode === "win") activateWinChoice();
   }
   function onA() {
     Sfx.unlock();
@@ -1422,7 +1486,7 @@
     else if (mode === "select") startPlay(whoPick);
     else if (mode === "play") tryRescue();
     else if (mode === "pause") resumePlay();
-    else if (mode === "win") startPlay(whoPick);
+    else if (mode === "win") activateWinChoice();
   }
 
   function wireUI() {
@@ -1430,12 +1494,7 @@
     $("btnLevelGo").addEventListener("click", function () { Sfx.unlock(); goSelect(); });
     $("pickL1").addEventListener("click", function () { chooseLevel(1); });
     $("pickL2").addEventListener("click", function () { chooseLevel(2); });
-    $("btnNextLevel").addEventListener("click", function () {
-      Sfx.unlock();
-      levelPick = 2;
-      loadLevel(2);
-      startPlay(whoPick);
-    });
+    bindTap($("btnNextLevel"), function () { goNextLevel(); });
     $("btnConfirm").addEventListener("click", function () { Sfx.unlock(); startPlay(whoPick); });
     $("pickBoy").addEventListener("click", function () { whoPick = "boy"; syncPick(); Sfx.blip(); });
     $("pickGirl").addEventListener("click", function () { whoPick = "girl"; syncPick(); Sfx.blip(); });
@@ -1825,6 +1884,7 @@
   }
 
   let bWas = false;
+  let winNavWas = 0;
   function frame(t) {
     const dt = Math.min(0.05, (t - lastT) / 1000 || 0.016);
     lastT = t;
@@ -1834,6 +1894,18 @@
       const dir = moveDir();
       if (dir.x < 0) { whoPick = "boy"; syncPick(); }
       if (dir.x > 0) { whoPick = "girl"; syncPick(); }
+    }
+    if (mode === "win") {
+      const dir = moveDir();
+      const step = dir.y < 0 ? -1 : dir.y > 0 ? 1 : 0;
+      if (step && step !== winNavWas) {
+        winChoice += step;
+        syncWinChoice();
+        Sfx.blip();
+      }
+      winNavWas = step;
+    } else {
+      winNavWas = 0;
     }
     if (mode === "levels") {
       const dir = moveDir();
@@ -1936,6 +2008,7 @@
       rescueAll: function () { cats.forEach(rescueCat); },
       goTitle: goTitle,
       goWin: goWin,
+      goNextLevel: goNextLevel,
       validate: validateLevel,
       overview: function (on) {
         if (on) {
