@@ -48,6 +48,19 @@
       </div>
     </div>
 
+
+    <div id="levelScreen" class="screen">
+      <div class="card">
+        <h2 class="big">Pick a rescue</h2>
+        <p class="tag">Two places the kitties got lost.</p>
+        <div class="level-list">
+          <button class="choice-btn on" id="pickL1" type="button" data-lvl="1">Level 1<span class="lvl-desc">The Forest — 4 kitties</span></button>
+          <button class="choice-btn" id="pickL2" type="button" data-lvl="2">Level 2<span class="lvl-desc">Meadow &amp; Mountain — 5 kitties</span></button>
+        </div>
+        <button class="gb-btn" id="btnLevelGo" type="button">A  Let's go!</button>
+        <p class="how">B to go back</p>
+      </div>
+    </div>
     <div id="selectScreen" class="screen">
       <div class="card">
         <h2 class="big">Who's heading out?</h2>
@@ -77,6 +90,7 @@
         <div class="time-line" id="winTime">Time 0:00</div>
         <div class="best-line" id="winBest">Best 0:00</div>
         <p class="tag">They are purring and ready for a nap.</p>
+        <button class="end-btn" id="btnNextLevel" type="button">Next Level ▶</button>
         <button class="end-btn" id="btnAgain" type="button">Rescue again</button>
         <button class="end-btn" id="btnWinMenu" type="button">Game Menu</button>
         <a class="end-btn" id="btnWinAll" href="https://koebelsundries.github.io/kids-games/" style="text-align:center;text-decoration:none;">🏠 All Games</a>
@@ -103,6 +117,6 @@
   </div>
 
   <script src="assets/sprites-v4.js"></script>
-  <script src="game.js?v=5"></script>
+  <script src="game.js?v=6"></script>
 </body>
 </html>

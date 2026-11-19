@@ -7,6 +7,7 @@
   const COLS = 52, ROWS = 40;
   const WORLD_W = COLS * TILE, WORLD_H = ROWS * TILE;
   const T_GRASS = 0, T_PATH = 1, T_WATER = 2, T_CLIFF = 3, T_LIP_N = 4, T_LIP_S = 5, T_BRIDGE = 6;
+  const T_STONE = 7, T_ROCKFACE = 8, T_CAVE = 9, T_CAVEWALL = 10, T_TALL = 11;
   const RAV_TOP = 16, RAV_BOT = 19, BRIDGE_C0 = 23, BRIDGE_C1 = 26;
   const SCORE_KEY = "iwrs-v1-best";
   const MUTE_KEY = "iwrs-v1-mute";
@@ -17,6 +18,9 @@
 
   let sheet = null, frames = {}, anims = {};
   let mode = "title";
+  let levelId = 1;
+  let levelPick = 1;
+  let overviewLock = false;
   let scale = 1, lastT = 0, elapsed = 0, startTime = 0, frozen = 0;
   let whoPick = "boy";
   let toastTimer = 0;
@@ -47,7 +51,7 @@
   let winDelay = 0;
   let previewT = 0;
 
-  const art = { grass: [], path: [], water: [], cliff: [], lipN: null, lipS: null, bridge: null, trees: {}, bushes: [], rocks: [], flowers: [], shroom: null, log: null, paw: null, rail: null };
+  const art = { grass: [], path: [], water: [], cliff: [], lipN: null, lipS: null, bridge: null, trees: {}, bushes: [], rocks: [], flowers: [], shroom: null, log: null, paw: null, rail: null, meadow: [], stone: [], rockface: [], caveFloor: null, caveWall: null, caveMouth: null, tallGrass: [], boulders: [] };
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -203,6 +207,82 @@
       art.rail = c;
     })();
 
+    // Level 2 meadow / mountain tiles and props (procedural 8-bit, same palette language).
+    art.meadow = [];
+    const MG = ["#4a9a4a", "#3d8a40", "#5cb056", "#2f6e32", "#7ac45e", "#255828", "#6ab05a"];
+    for (let i = 0; i < 8; i++) {
+      const { c, g } = mk(TILE, TILE);
+      const r = rng(3100 + i * 19);
+      fill(g, 0, 0, TILE, TILE, i % 2 ? MG[1] : MG[0]);
+      for (let k = 0; k < 30; k++) {
+        const col = r() < 0.4 ? MG[2] : r() < 0.7 ? MG[3] : r() < 0.88 ? MG[4] : MG[5];
+        dot(g, (r() * 16) | 0, (r() * 16) | 0, col);
+      }
+      if (i === 2) { dot(g, 4, 5, "#f2d2e4"); dot(g, 5, 4, "#f2d2e4"); dot(g, 5, 5, "#fff06a"); }
+      if (i === 3) { dot(g, 11, 9, "#fff8e0"); dot(g, 10, 10, "#fff8e0"); dot(g, 11, 10, "#f0c040"); }
+      if (i === 6) { dot(g, 7, 3, "#e070a0"); dot(g, 8, 4, "#e070a0"); dot(g, 7, 4, "#fff06a"); }
+      art.meadow.push(c);
+    }
+
+    art.stone = [];
+    const ST = ["#8a8480", "#6e6864", "#a09a90", "#5a544e", "#b0a898", "#4a463e", "#7a6a58"];
+    for (let i = 0; i < 4; i++) {
+      const { c, g } = mk(TILE, TILE);
+      const r = rng(3300 + i * 11);
+      fill(g, 0, 0, TILE, TILE, ST[1]);
+      for (let k = 0; k < 30; k++) dot(g, (r() * 16) | 0, (r() * 16) | 0, r() < 0.45 ? ST[0] : r() < 0.8 ? ST[2] : ST[6]);
+      for (let k = 0; k < 4; k++) {
+        const x = (r() * 12) | 0, y = (r() * 12) | 0;
+        fill(g, x, y, 4, 3, r() < 0.5 ? ST[4] : ST[0]);
+        dot(g, x, y + 2, ST[5]);
+      }
+      art.stone.push(c);
+    }
+
+    // Chunky cliff face: a light lip on top, dark vertical rock below (not railroad bands).
+    art.rockface = [];
+    for (let i = 0; i < 4; i++) {
+      const { c, g } = mk(TILE, TILE);
+      const r = rng(3500 + i * 23);
+      fill(g, 0, 0, TILE, TILE, i % 2 ? "#4a443c" : "#3e3a32");
+      for (let k = 0; k < 22; k++) dot(g, (r() * 16) | 0, (r() * 16) | 0, r() < 0.5 ? "#2e2a24" : "#6a6458");
+      // a couple of irregular vertical cracks, not a regular fence
+      const cx = 2 + ((i * 5 + 3) % 12);
+      fill(g, cx, 4, 1, 8 + (i % 3), "#2a261e");
+      if (r() > 0.3) fill(g, (cx + 6) % 14 + 1, 6, 1, 6, "#2a261e");
+      // blocky highlight
+      fill(g, 3 + i, 5, 4, 2, "#6a6458");
+      art.rockface.push(c);
+    }
+    art.rockLip = art.rockface.map(function (src) {
+      const { c, g } = mk(TILE, TILE);
+      g.drawImage(src, 0, 0);
+      fill(g, 0, 0, TILE, 2, "#8a8276");
+      fill(g, 0, 2, TILE, 1, "#2a261e");
+      for (let x = 1; x < 16; x += 3) dot(g, x, 0, "#b0a898");
+      return c;
+    });
+
+    (function () {
+      const { c, g } = mk(TILE, TILE);
+      fill(g, 0, 0, TILE, TILE, "#121018");
+      const r = rng(3601);
+      for (let k = 0; k < 10; k++) dot(g, (r() * 16) | 0, (r() * 16) | 0, r() < 0.5 ? "#1c1822" : "#2a2430");
+      art.caveFloor = c;
+    })();
+    (function () {
+      const { c, g } = mk(TILE, TILE);
+      fill(g, 0, 0, TILE, TILE, "#0c0a10");
+      const r = rng(3602);
+      for (let y = 0; y < TILE; y++) if (y % 4 === 0) fill(g, 0, y, TILE, 1, "#16121c");
+      for (let k = 0; k < 12; k++) dot(g, (r() * 16) | 0, (r() * 16) | 0, "#24202a");
+      art.caveWall = c;
+    })();
+
+    art.tallGrass = [0, 1, 2, 3].map(function (i) { return drawTallGrass(210 + i * 9); });
+    art.boulders = [0, 1, 2].map(function (i) { return drawBoulder(260 + i * 7); });
+    art.caveMouth = drawCaveMouth();
+
     art.trees.oak = [0, 1, 2].map(function (i) { return drawOak(40 + i * 19); });
     art.trees.pine = [0, 1].map(function (i) { return drawPine(70 + i * 11); });
     art.trees.birch = [drawBirch(91)];
@@ -320,10 +400,59 @@
   }
 
 
+
+  function drawTallGrass(seed) {
+    const r = rng(seed);
+    const w = 16, h = 20;
+    const { c, g } = mk(w, h);
+    const cols = ["#2a6a32", "#1e5428", "#34843c", "#4a9a44", "#1a4a22"];
+    for (let i = 0; i < 9; i++) {
+      const x = 1 + ((r() * 14) | 0);
+      const top = 1 + ((r() * 6) | 0);
+      const col = cols[(seed + i) % cols.length];
+      fill(g, x, top, 1, h - top, col);
+      if (r() < 0.55) fill(g, x + (r() < 0.5 ? 1 : -1), top + 1, 1, 3, col);
+      if (r() < 0.4) dot(g, x, top, r() < 0.5 ? "#f0c040" : "#e070a0");
+    }
+    return { c: c, ax: 8, ay: h, tw: 0, th: 0 };
+  }
+  function drawBoulder(seed) {
+    const r = rng(seed);
+    const w = 18, h = 14;
+    const { c, g } = mk(w, h);
+    blob(g, 9, 8, 7, "#6a6a62", r);
+    blob(g, 8, 7, 5, "#8a8a80", r);
+    blob(g, 11, 9, 4, "#5a5a52", r);
+    dot(g, 6, 6, "#b0b0a4");
+    dot(g, 7, 5, "#b0b0a4");
+    return { c: c, ax: 9, ay: h, tw: 14, th: 7 };
+  }
+  function drawCaveMouth() {
+    const w = 48, h = 36;
+    const { c, g } = mk(w, h);
+    // left / right pillars and a stone lintel; opening stays transparent
+    fill(g, 0, 8, 8, 28, "#4a443c");
+    fill(g, 1, 8, 2, 28, "#6a6458");
+    fill(g, 6, 8, 1, 28, "#2e2a24");
+    fill(g, 40, 8, 8, 28, "#4a443c");
+    fill(g, 41, 8, 2, 28, "#6a6458");
+    fill(g, 46, 8, 1, 28, "#2e2a24");
+    fill(g, 0, 0, 48, 14, "#3a362e");
+    fill(g, 0, 0, 48, 4, "#5a5448");
+    fill(g, 2, 12, 44, 3, "#2a261e");
+    // arch curve cut (transparent hole)
+    g.clearRect(8, 14, 32, 22);
+    // inner dark rim
+    fill(g, 8, 14, 32, 3, "#121018");
+    fill(g, 8, 14, 2, 22, "#121018");
+    fill(g, 38, 14, 2, 22, "#121018");
+    return { c: c, ax: 24, ay: 36 };
+  }
+
   function ti(c, r) { return r * COLS + c; }
   function inb(c, r) { return c >= 0 && r >= 0 && c < COLS && r < ROWS; }
 
-  function buildMap() {
+  function buildMapL1() {
     tiles = new Uint8Array(COLS * ROWS);
     grassVar = new Uint8Array(COLS * ROWS);
     pathVar = new Uint8Array(COLS * ROWS);
@@ -520,7 +649,248 @@
     }
   }
 
-  const CAT_SPOTS = [
+
+  function buildMap() {
+    if (levelId === 2) buildMapL2();
+    else buildMapL1();
+  }
+
+  function inMountain(c, r) {
+    if (r > 21 || r < 0) return false;
+    const halfW = 7 + r * 0.7;
+    const wobble = (hash(c, r, 70) - 0.5) * 2.4;
+    return Math.abs(c - 24) < halfW + wobble && c >= 2 && c <= 49;
+  }
+
+  function buildMapL2() {
+    tiles = new Uint8Array(COLS * ROWS);
+    grassVar = new Uint8Array(COLS * ROWS);
+    pathVar = new Uint8Array(COLS * ROWS);
+    keepClear = new Uint8Array(COLS * ROWS);
+    solids = [];
+    props = [];
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        tiles[ti(c, r)] = T_GRASS;
+        grassVar[ti(c, r)] = (hash(c, r, 3) * 8) | 0;
+        pathVar[ti(c, r)] = (hash(c, r, 9) * 4) | 0;
+      }
+    }
+
+    // Mountain body: solid rock, then walkable terraces, then a winding path.
+    for (let r = 0; r <= 21; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (!inMountain(c, r)) continue;
+        const terrace = (r >= 8 && r <= 10) || (r >= 13 && r <= 15) || (r >= 18 && r <= 21);
+        tiles[ti(c, r)] = terrace ? T_GRASS : T_ROCKFACE;
+      }
+    }
+
+    // Cave pocket in the peak, opening south onto the upper terrace.
+    for (let c = 19; c <= 25; c++) tiles[ti(c, 2)] = T_CAVEWALL;
+    for (let r = 3; r <= 6; r++) {
+      tiles[ti(19, r)] = T_CAVEWALL;
+      tiles[ti(25, r)] = T_CAVEWALL;
+      for (let c = 20; c <= 24; c++) tiles[ti(c, r)] = T_CAVE;
+    }
+    // Dark opening cuts the riser at row 7
+    for (let c = 21; c <= 23; c++) tiles[ti(c, 7)] = T_CAVE;
+
+    function markClear(c0, r0, c1, r1) {
+      for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (inb(c, r)) keepClear[ti(c, r)] = 1;
+    }
+    function paintTrail(c, r) {
+      if (!inb(c, r)) return;
+      const t = tiles[ti(c, r)];
+      if (t === T_CAVEWALL) return;
+      if (t === T_CAVE) { keepClear[ti(c, r)] = 1; return; }
+      tiles[ti(c, r)] = (r >= 22) ? T_PATH : T_STONE;
+      keepClear[ti(c, r)] = 1;
+    }
+    function carve(c0, r0, c1, r1, seed, wide) {
+      const r = rng(seed);
+      let c = c0, row = r0, guard = 0;
+      while ((c !== c1 || row !== r1) && guard++ < 500) {
+        paintTrail(c, row);
+        if (wide) {
+          paintTrail(c + 1, row);
+          paintTrail(c, row + 1);
+        } else if (r() < 0.4) paintTrail(c + 1, row);
+        if (c !== c1 && (row === r1 || r() < 0.55)) c += Math.sign(c1 - c);
+        else if (row !== r1) row += Math.sign(r1 - row);
+        else c += Math.sign(c1 - c);
+      }
+      paintTrail(c1, r1);
+      if (wide) { paintTrail(c1 + 1, r1); paintTrail(c1, r1 + 1); }
+    }
+
+    markClear(23, 33, 29, 38);
+    markClear(5, 28, 11, 34);
+    markClear(39, 30, 46, 36);
+    markClear(38, 16, 45, 21);
+    markClear(7, 12, 14, 16);
+    markClear(19, 2, 25, 8);
+    markClear(20, 6, 24, 12);
+
+    // Meadow approach, then switchbacks up the mountain to the cave.
+    const legs = [
+      [26, 36, 26, 32, 201],
+      [26, 32, 22, 28, 202],
+      [22, 28, 16, 24, 203],
+      [16, 24, 11, 20, 204],
+      [11, 20, 10, 16, 205], // west ramp through riser 17
+      [10, 16, 18, 15, 206],
+      [18, 15, 30, 14, 207],
+      [30, 14, 36, 13, 208],
+      [36, 13, 36, 10, 209], // east ramp through riser 12
+      [36, 10, 30, 9, 210],
+      [30, 9, 24, 8, 211],
+      [24, 8, 22, 6, 212]  // ramp through riser 7 into the cave mouth
+    ];
+    legs.forEach(function (L) { carve(L[0], L[1], L[2], L[3], L[4], true); });
+    // Spur east across the foothills to Pebble
+    carve(30, 14, 38, 17, 220, true);
+    carve(38, 17, 41, 19, 221, true);
+    // Spur west on the mid terrace to Thistle
+    carve(12, 15, 9, 14, 222, true);
+
+    const paws = [[26, 35], [25, 32], [20, 27], [14, 23], [11, 19], [18, 15], [30, 14], [36, 11], [28, 9]];
+    paws.forEach(function (p) {
+      props.push({ kind: "paw", x: p[0] * TILE + 8, y: p[1] * TILE + 10, img: art.paw, z: p[1] * TILE });
+    });
+
+    // Dense meadow flowers, a few on the terraces.
+    for (let r = 1; r < ROWS - 1; r++) {
+      for (let c = 1; c < COLS - 1; c++) {
+        const t = tiles[ti(c, r)];
+        if (t === T_ROCKFACE || t === T_CAVE || t === T_CAVEWALL || t === T_STONE) continue;
+        const h = hash(c, r, 21);
+        const meadow = r >= 22;
+        if (meadow && h < 0.14) {
+          const f = art.flowers[(hash(c, r, 22) * art.flowers.length) | 0];
+          props.push({ kind: "flower", x: c * TILE + 4 + hash(c, r, 4) * 8, y: r * TILE + 8 + hash(c, r, 5) * 6, img: f, z: 0 });
+        } else if (!meadow && t === T_GRASS && h < 0.05) {
+          const f = art.flowers[(hash(c, r, 22) * art.flowers.length) | 0];
+          props.push({ kind: "flower", x: c * TILE + 6, y: r * TILE + 10, img: f, z: 0 });
+        } else if (meadow && h > 0.985) {
+          tiles[ti(c, r)] = T_TALL;
+        }
+      }
+    }
+
+    function canPlace(c, r, pad) {
+      for (let yy = -pad; yy <= pad; yy++) for (let xx = -pad; xx <= pad; xx++) {
+        if (!inb(c + xx, r + yy)) return false;
+        const t = tiles[ti(c + xx, r + yy)];
+        if (t !== T_GRASS && t !== T_TALL) return false;
+        if (keepClear[ti(c + xx, r + yy)]) return false;
+      }
+      return true;
+    }
+    function addProp(kind, pack, x, y, solid) {
+      const obj = { kind: kind, x: x, y: y, img: pack, z: y, ox: pack.ax, oy: pack.ay };
+      if (solid && pack.tw) {
+        const s = { x: x - pack.tw / 2, y: y - pack.th, w: pack.tw, h: pack.th };
+        obj.solid = s;
+        solids.push(s);
+      }
+      props.push(obj);
+    }
+
+    // Sparse trees: open meadow middle, a few pines on terraces and along the rim.
+    for (let r = 1; r < ROWS - 1; r++) {
+      for (let c = 1; c < COLS - 1; c++) {
+        if (!canPlace(c, r, 1)) continue;
+        const border = c < 2 || r > ROWS - 3 || c > COLS - 3;
+        const meadow = r >= 22;
+        let chance;
+        if (border) chance = 0.55;
+        else if (meadow) chance = 0.07;
+        else chance = 0.1;
+        if (hash(c, r, 31) > chance) continue;
+        const roll = hash(c, r, 33);
+        let pack, kind;
+        if (!meadow || roll < 0.45) { kind = "pine"; pack = art.trees.pine[(hash(c, r, 34) * art.trees.pine.length) | 0]; }
+        else if (roll > 0.88) { kind = "birch"; pack = art.trees.birch[0]; }
+        else { kind = "oak"; pack = art.trees.oak[(hash(c, r, 35) * art.trees.oak.length) | 0]; }
+        const jx = (hash(c, r, 36) - 0.5) * 8;
+        const jy = (hash(c, r, 37) - 0.5) * 6;
+        addProp(kind, pack, c * TILE + 8 + jx, r * TILE + 14 + jy, true);
+        keepClear[ti(c, r)] = 2;
+      }
+    }
+
+    // Light rim of pines, leaving the south meadow approach open.
+    for (let c = 0; c < COLS; c++) {
+      if (c >= 22 && c <= 30) continue;
+      addProp("pine", art.trees.pine[c % art.trees.pine.length], c * TILE + 8, 14, true);
+      if (c < 4 || c > COLS - 5) {
+        addProp("pine", art.trees.pine[(c + 1) % art.trees.pine.length], c * TILE + 8, (ROWS - 1) * TILE + 14, true);
+      }
+    }
+    for (let r = 2; r < ROWS - 1; r++) {
+      if (r >= 32 && r <= 38) continue;
+      addProp("pine", art.trees.pine[r % art.trees.pine.length], 8, r * TILE + 14, true);
+      addProp("pine", art.trees.pine[(r + 1) % art.trees.pine.length], (COLS - 1) * TILE + 8, r * TILE + 14, true);
+    }
+
+    // Tall grass hides (Daisy SE, plus a couple of meadow patches).
+    const grassClumps = [
+      [41, 32], [42, 33], [43, 33], [44, 32], [43, 34], [41, 34], [42, 31],
+      [18, 34], [19, 35], [20, 34],
+      [33, 28], [34, 29], [32, 29]
+    ];
+    grassClumps.forEach(function (p, i) {
+      const pack = art.tallGrass[i % art.tallGrass.length];
+      addProp("tallgrass", pack, p[0] * TILE + 8, p[1] * TILE + 14, false);
+    });
+
+    // Hiding rocks / boulders: Clover SW, Pebble east foothills, Thistle west ledge.
+    const boulders = [
+      [8, 32], [9, 31],
+      [40, 18], [42, 18], [41, 17],
+      [11, 14], [10, 13],
+      [16, 20], [28, 21], [20, 22], [6, 24]
+    ];
+    boulders.forEach(function (p, i) {
+      if (!inb(p[0], p[1])) return;
+      if (tiles[ti(p[0], p[1])] === T_PATH || tiles[ti(p[0], p[1])] === T_STONE || tiles[ti(p[0], p[1])] === T_CAVE) return;
+      const pack = art.boulders[i % art.boulders.length];
+      addProp("boulder", pack, p[0] * TILE + 8, p[1] * TILE + 12, true);
+    });
+
+    const bushSpots = [[6, 35], [12, 37], [30, 33], [36, 36], [48, 30], [15, 26], [44, 24], [8, 22]];
+    bushSpots.forEach(function (p, i) {
+      if (!inb(p[0], p[1]) || keepClear[ti(p[0], p[1])]) return;
+      addProp("bush", art.bushes[i % art.bushes.length], p[0] * TILE + 8, p[1] * TILE + 12, false);
+    });
+
+    // Cave mouth arch at the threshold (open in the middle; not solid).
+    props.push({
+      kind: "cavemouth",
+      x: 22 * TILE + 8,
+      y: 8 * TILE,
+      img: art.caveMouth,
+      z: 7 * TILE + 8
+    });
+
+    props.forEach(function (p) { if (!p.z) p.z = p.y; });
+
+    motes = [];
+    for (let i = 0; i < 22; i++) {
+      motes.push({
+        x: Math.random() * WORLD_W,
+        y: Math.random() * WORLD_H,
+        s: 0.3 + Math.random() * 0.6,
+        p: Math.random() * Math.PI * 2,
+        col: Math.random() < 0.5 ? "#ffe9a0" : "#e8f8c8"
+      });
+    }
+  }
+
+  const CAT_SPOTS_L1 = [
+
     { kind: "tabby", name: "Pumpkin", x: 10 * TILE + 8, y: 29 * TILE + 10 },
     { kind: "tux", name: "Oreo", x: 41 * TILE + 8, y: 26 * TILE + 8 },
     { kind: "tabby", name: "Maple", x: 10 * TILE + 8, y: 8 * TILE + 10 },
@@ -528,8 +898,81 @@
   ];
   const START = { x: 24 * TILE + 8, y: 33 * TILE + 8 };
 
+  const CAT_SPOTS_L2 = [
+    { kind: "tabby", name: "Daisy",   x: 43 * TILE + 8, y: 33 * TILE + 10 },
+    { kind: "tabby", name: "Clover",  x: 7 * TILE + 8,  y: 30 * TILE + 10 },
+    { kind: "tux",   name: "Pebble",  x: 41 * TILE + 8, y: 19 * TILE + 8 },
+    { kind: "tux",   name: "Echo",    x: 22 * TILE + 8, y: 4 * TILE + 10 },
+    { kind: "tabby", name: "Thistle", x: 9 * TILE + 8,  y: 14 * TILE + 10 }
+  ];
+  const START_L2 = { x: 26 * TILE + 8, y: 36 * TILE + 8 };
+  const TITLE_CAM_L1 = { x: 24 * TILE, y: 17 * TILE };
+  const TITLE_CAM_L2 = { x: 24 * TILE, y: 16 * TILE };
+
+  function catSpots() { return levelId === 2 ? CAT_SPOTS_L2 : CAT_SPOTS_L1; }
+  function startPos() { return levelId === 2 ? START_L2 : START; }
+  function catGoal() { return levelId === 2 ? 5 : 4; }
+  function scoreKey() { return levelId === 2 ? "iwrs-v2-best" : SCORE_KEY; }
+  function titleCam() { return (mode === "levels" ? levelPick : levelId) === 2 ? TITLE_CAM_L2 : TITLE_CAM_L1; }
+  function setHudCats() { $("hudCats").textContent = "Cats " + rescuedCount + "/" + catGoal(); }
+
+  function loadLevel(id) {
+    levelId = (id === 2) ? 2 : 1;
+    buildMap();
+    resetCats();
+  }
+
+  function pointReached(seen, x, y, step) {
+    const gx = Math.round(x / step) * step, gy = Math.round(y / step) * step;
+    for (let dy = -step; dy <= step; dy += step) {
+      for (let dx = -step; dx <= step; dx += step) {
+        if (seen.has(((gx + dx) | 0) + "," + ((gy + dy) | 0))) return true;
+      }
+    }
+    return false;
+  }
+
+  function validateLevel() {
+    const start = startPos();
+    const step = 4;
+    const seen = new Set();
+    const q = [];
+    function tryAdd(x, y) {
+      if (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H) return;
+      const k = (x | 0) + "," + (y | 0);
+      if (seen.has(k)) return;
+      if (blocked(x, y)) return;
+      seen.add(k);
+      q.push([x, y]);
+    }
+    tryAdd(start.x, start.y);
+    let qi = 0;
+    while (qi < q.length) {
+      const p = q[qi++];
+      tryAdd(p[0] + step, p[1]);
+      tryAdd(p[0] - step, p[1]);
+      tryAdd(p[0], p[1] + step);
+      tryAdd(p[0], p[1] - step);
+    }
+    const report = {
+      level: levelId,
+      startBlocked: blocked(start.x, start.y),
+      reached: seen.size,
+      cats: catSpots().map(function (s) {
+        return {
+          name: s.name,
+          x: s.x, y: s.y,
+          inSolid: blocked(s.x, s.y),
+          reachable: pointReached(seen, s.x, s.y, step)
+        };
+      })
+    };
+    report.ok = !report.startBlocked && report.cats.every(function (c) { return !c.inSolid && c.reachable; });
+    return report;
+  }
+
   function resetCats() {
-    cats = CAT_SPOTS.map(function (s) {
+    cats = catSpots().map(function (s) {
       return {
         kind: s.kind, name: s.name,
         x: s.x, y: s.y, homeX: s.x, homeY: s.y,
@@ -761,7 +1204,7 @@
 
   function makePlayer(kind) {
     player = {
-      kind: kind, x: START.x, y: START.y,
+      kind: kind, x: startPos().x, y: startPos().y,
       flip: 0, drawFlip: 0, facing: "down",
       walking: false, run: false,
       anim: 0, stepAcc: 0, frame: anims[kind].idleDown || anims[kind].idle
@@ -775,7 +1218,7 @@
     const c = Math.floor(x / TILE), r = Math.floor(y / TILE);
     if (!inb(c, r)) return true;
     const t = tiles[ti(c, r)];
-    return t === T_WATER || t === T_CLIFF || t === T_LIP_N || t === T_LIP_S;
+    return t === T_WATER || t === T_CLIFF || t === T_LIP_N || t === T_LIP_S || t === T_ROCKFACE || t === T_CAVEWALL;
   }
   function objSolid(x, y) {
     for (let i = 0; i < solids.length; i++) {
@@ -841,8 +1284,8 @@
     burst(cat.x, cat.y);
     Sfx.rescue();
     showToast("You rescued " + cat.name + "!");
-    $("hudCats").textContent = "Cats " + rescuedCount + "/4";
-    if (rescuedCount >= 4) winDelay = 1.15;
+    setHudCats();
+    if (rescuedCount >= catGoal()) winDelay = 1.15;
   }
 
   function tryRescue() {
@@ -858,7 +1301,7 @@
   }
 
   function hideScreens() {
-    ["titleScreen", "selectScreen", "pauseMenu", "winScreen"].forEach(function (id) {
+    ["titleScreen", "levelScreen", "selectScreen", "pauseMenu", "winScreen"].forEach(function (id) {
       $(id).classList.remove("show");
     });
   }
@@ -871,10 +1314,35 @@
     $("titleScreen").classList.add("show");
     showControls(false); showHud(false);
     $("prompt").classList.remove("show");
-    cam.x = 24 * TILE - VW / 2;
-    cam.y = 17 * TILE - VH / 2;
     player = null;
-    resetCats();
+    if (levelId !== 1) loadLevel(1);
+    else resetCats();
+    const tc = TITLE_CAM_L1;
+    cam.x = tc.x - VW / 2;
+    cam.y = tc.y - VH / 2;
+  }
+  function syncLevelPick() {
+    $("pickL1").classList.toggle("on", levelPick === 1);
+    $("pickL2").classList.toggle("on", levelPick === 2);
+  }
+  function goLevelSelect() {
+    mode = "levels";
+    hideScreens();
+    $("levelScreen").classList.add("show");
+    showControls(true); showHud(false);
+    $("prompt").classList.remove("show");
+    syncLevelPick();
+    if (levelId !== levelPick) loadLevel(levelPick);
+    else resetCats();
+    const tc = titleCam();
+    cam.x = clamp(tc.x - VW / 2, 0, WORLD_W - VW);
+    cam.y = clamp(tc.y - VH / 2, 0, WORLD_H - VH);
+  }
+  function chooseLevel(id) {
+    levelPick = (id === 2) ? 2 : 1;
+    syncLevelPick();
+    loadLevel(levelPick);
+    Sfx.blip();
   }
   function goSelect() {
     mode = "select";
@@ -883,14 +1351,17 @@
     showControls(true); showHud(false);
     $("prompt").classList.remove("show");
     syncPick();
-    cam.x = clamp(START.x - VW / 2, 0, WORLD_W - VW);
-    cam.y = clamp(START.y - 50, 0, WORLD_H - VH);
+    if (levelId !== levelPick) loadLevel(levelPick);
+    const s = startPos();
+    cam.x = clamp(s.x - VW / 2, 0, WORLD_W - VW);
+    cam.y = clamp(s.y - 50, 0, WORLD_H - VH);
   }
   function syncPick() {
     $("pickBoy").classList.toggle("on", whoPick === "boy");
     $("pickGirl").classList.toggle("on", whoPick === "girl");
   }
   function startPlay(kind) {
+    if (levelId !== levelPick) loadLevel(levelPick);
     mode = "play";
     hideScreens();
     showControls(true); showHud(true);
@@ -901,8 +1372,8 @@
     startTime = performance.now();
     elapsed = 0;
     winDelay = 0;
-    $("hudCats").textContent = "Cats 0/4";
-    showToast("Find 4 injured kitties!");
+    setHudCats();
+    showToast("Find " + catGoal() + " injured kitties!");
     Sfx.blip();
   }
   function goPause() {
@@ -923,11 +1394,13 @@
     showControls(false); showHud(true);
     $("prompt").classList.remove("show");
     const t = elapsed;
-    const bestRaw = parseFloat(storeGet(SCORE_KEY, "0")) || 0;
+    const key = scoreKey();
+    const bestRaw = parseFloat(storeGet(key, "0")) || 0;
     let best = bestRaw;
-    if (!best || t < best) { best = t; storeSet(SCORE_KEY, String(best)); }
+    if (!best || t < best) { best = t; storeSet(key, String(best)); }
     $("winTime").textContent = "Time " + formatTime(t);
     $("winBest").textContent = "Best " + formatTime(best);
+    $("btnNextLevel").classList.toggle("hidden", levelId !== 1);
     $("winScreen").classList.add("show");
     Sfx.win();
     if (player) burst(player.x, player.y - 8);
@@ -935,7 +1408,8 @@
 
   function onStart() {
     Sfx.unlock();
-    if (mode === "title") goSelect();
+    if (mode === "title") goLevelSelect();
+    else if (mode === "levels") goSelect();
     else if (mode === "select") startPlay(whoPick);
     else if (mode === "play") goPause();
     else if (mode === "pause") resumePlay();
@@ -943,7 +1417,8 @@
   }
   function onA() {
     Sfx.unlock();
-    if (mode === "title") goSelect();
+    if (mode === "title") goLevelSelect();
+    else if (mode === "levels") goSelect();
     else if (mode === "select") startPlay(whoPick);
     else if (mode === "play") tryRescue();
     else if (mode === "pause") resumePlay();
@@ -951,7 +1426,16 @@
   }
 
   function wireUI() {
-    $("btnStart").addEventListener("click", function () { Sfx.unlock(); goSelect(); });
+    $("btnStart").addEventListener("click", function () { Sfx.unlock(); goLevelSelect(); });
+    $("btnLevelGo").addEventListener("click", function () { Sfx.unlock(); goSelect(); });
+    $("pickL1").addEventListener("click", function () { chooseLevel(1); });
+    $("pickL2").addEventListener("click", function () { chooseLevel(2); });
+    $("btnNextLevel").addEventListener("click", function () {
+      Sfx.unlock();
+      levelPick = 2;
+      loadLevel(2);
+      startPlay(whoPick);
+    });
     $("btnConfirm").addEventListener("click", function () { Sfx.unlock(); startPlay(whoPick); });
     $("pickBoy").addEventListener("click", function () { whoPick = "boy"; syncPick(); Sfx.blip(); });
     $("pickGirl").addEventListener("click", function () { whoPick = "girl"; syncPick(); Sfx.blip(); });
@@ -1094,7 +1578,7 @@
   function updateFX(dt) {
     waterTick += dt;
     birdTimer -= dt;
-    if (birdTimer <= 0 && (mode === "play" || mode === "title" || mode === "select")) {
+    if (birdTimer <= 0 && (mode === "play" || mode === "title" || mode === "select" || mode === "levels")) {
       if (Math.random() < 0.7) Sfx.bird();
       birdTimer = 5 + Math.random() * 7;
     }
@@ -1171,12 +1655,26 @@
         const t = tiles[ti(c, r)];
         const dx = c * TILE - cam.x, dy = r * TILE - cam.y;
         let img = art.grass[grassVar[ti(c, r)]];
+        if (t === T_GRASS && levelId === 2 && art.meadow.length) img = art.meadow[grassVar[ti(c, r)] % art.meadow.length];
         if (t === T_PATH) img = art.path[pathVar[ti(c, r)]];
         else if (t === T_WATER) img = art.water[wf];
         else if (t === T_CLIFF) img = art.cliff[0];
         else if (t === T_LIP_N) img = art.lipN;
         else if (t === T_LIP_S) img = art.lipS;
         else if (t === T_BRIDGE) img = art.bridge;
+        else if (t === T_STONE) img = art.stone[pathVar[ti(c, r)] % art.stone.length];
+        else if (t === T_ROCKFACE) {
+          const ix = grassVar[ti(c, r)] % art.rockface.length;
+          const above = r > 0 ? tiles[ti(c, r - 1)] : T_ROCKFACE;
+          const cap = above !== T_ROCKFACE && above !== T_CAVEWALL;
+          img = (cap && art.rockLip && art.rockLip[ix]) ? art.rockLip[ix] : art.rockface[ix];
+        }
+
+        else if (t === T_CAVE) img = art.caveFloor;
+        else if (t === T_CAVEWALL) img = art.caveWall;
+        else if (t === T_TALL) {
+          img = (levelId === 2 && art.meadow.length) ? art.meadow[grassVar[ti(c, r)] % art.meadow.length] : art.grass[grassVar[ti(c, r)]];
+        }
         if (img) ctx.drawImage(img, dx, dy);
         else ctx.drawImage(art.grass[0], dx, dy);
       }
@@ -1195,8 +1693,9 @@
       drawList.push({ kind: "player", z: player.y });
     }
     if (mode === "select") {
-      drawList.push({ kind: "preview", who: "boy", x: START.x - 18, y: START.y, z: START.y });
-      drawList.push({ kind: "preview", who: "girl", x: START.x + 18, y: START.y, z: START.y });
+      const s = startPos();
+      drawList.push({ kind: "preview", who: "boy", x: s.x - 18, y: s.y, z: s.y });
+      drawList.push({ kind: "preview", who: "girl", x: s.x + 18, y: s.y, z: s.y });
     }
     drawList.sort(function (a, b) { return (a.z || a.y) - (b.z || b.y); });
 
@@ -1237,7 +1736,7 @@
         const ay = (p.img.ay != null) ? p.img.ay : (p.oy || 0);
         const dx = Math.round(p.x - cam.x - ax);
         const dy = Math.round(p.y - cam.y - ay);
-        if (p.kind === "oak" || p.kind === "pine" || p.kind === "birch" || p.kind === "bush") {
+        if (p.kind === "oak" || p.kind === "pine" || p.kind === "birch" || p.kind === "bush" || p.kind === "tallgrass" || p.kind === "boulder") {
           shadow(p.x, p.y, p.kind === "bush" ? 6 : 8, 3);
         }
         if (img && img.getContext) ctx.drawImage(img, dx, dy);
@@ -1274,11 +1773,13 @@
       ctx.globalAlpha = 1;
     });
 
-    const vg = ctx.createRadialGradient(VW / 2, VH / 2, 70, VW / 2, VH / 2, 150);
-    vg.addColorStop(0, "rgba(0,0,0,0)");
-    vg.addColorStop(1, "rgba(8,16,8,0.28)");
-    ctx.fillStyle = vg;
-    ctx.fillRect(0, 0, VW, VH);
+    if (!overviewLock) {
+      const vg = ctx.createRadialGradient(VW / 2, VH / 2, 70, VW / 2, VH / 2, 150);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(8,16,8,0.28)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, VW, VH);
+    }
 
     if (mode === "pause") {
       ctx.fillStyle = "rgba(8,16,8,0.4)";
@@ -1302,6 +1803,7 @@
   }
 
   function layout() {
+    if (overviewLock) return;
     const v = viewBox();
     const short = Math.min(v.w, v.h);
     scale = Math.max(1, Math.floor(short / MIN_SHORT));
@@ -1333,6 +1835,17 @@
       if (dir.x < 0) { whoPick = "boy"; syncPick(); }
       if (dir.x > 0) { whoPick = "girl"; syncPick(); }
     }
+    if (mode === "levels") {
+      const dir = moveDir();
+      if (dir.y < 0 && levelPick !== 1) chooseLevel(1);
+      if (dir.y > 0 && levelPick !== 2) chooseLevel(2);
+      const tc = titleCam();
+      const tsec = t / 1000;
+      const tx = tc.x - VW / 2 + Math.sin(tsec * 0.15) * 28;
+      const ty = tc.y - VH / 2 + Math.cos(tsec * 0.12) * 16;
+      cam.x = lerp(cam.x, clamp(tx, 0, WORLD_W - VW), 0.08);
+      cam.y = lerp(cam.y, clamp(ty, 0, WORLD_H - VH), 0.08);
+    }
     if (mode === "title") {
       const tsec = t / 1000;
       const tx = 24 * TILE - VW / 2 + Math.sin(tsec * 0.15) * 40;
@@ -1345,7 +1858,8 @@
       onA();
     }
     const bNow = bHeld();
-    if (bNow && !bWas && mode === "select") goTitle();
+    if (bNow && !bWas && mode === "select") goLevelSelect();
+    if (bNow && !bWas && mode === "levels") goTitle();
     bWas = bNow;
 
     try {
@@ -1411,14 +1925,34 @@
       get animSet() { return player && poseFor(player.kind, player.facing || "down", !!player.walking, player.anim).set; },
       get cats() { return cats; },
       get rescued() { return rescuedCount; },
+      get level() { return levelId; },
       choose: function (w) { whoPick = w === "girl" ? "girl" : "boy"; syncPick(); },
       goSelect: goSelect,
+      goLevelSelect: goLevelSelect,
       start: function (w) { if (w) whoPick = w; startPlay(whoPick); },
+      startLevel: function (id, w) { levelPick = (id === 2) ? 2 : 1; loadLevel(levelPick); if (w) whoPick = w; startPlay(whoPick); },
       setPos: function (x, y) { if (player) { player.x = x; player.y = y; } },
       rescueNearest: function () { tryRescue(); },
       rescueAll: function () { cats.forEach(rescueCat); },
       goTitle: goTitle,
-      goWin: goWin
+      goWin: goWin,
+      validate: validateLevel,
+      overview: function (on) {
+        if (on) {
+          overviewLock = true;
+          VW = WORLD_W; VH = WORLD_H;
+          canvas.width = WORLD_W; canvas.height = WORLD_H;
+          canvas.style.width = WORLD_W + "px";
+          canvas.style.height = WORLD_H + "px";
+          canvas.style.left = "0px"; canvas.style.top = "0px";
+          cam.x = 0; cam.y = 0;
+          ctx.imageSmoothingEnabled = false;
+          drawWorld();
+        } else {
+          overviewLock = false;
+          layout();
+        }
+      }
     };
   }
 

@@ -300,3 +300,9 @@ body.desktop #controls.show #btnB { opacity: 0.28; }
   #dpad .cap { left: 36px; top: 36px; width: 28px; height: 28px; }
   #btnA, #btnB { width: 62px; height: 62px; }
 }
+
+.level-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.lvl-desc { display: block; font-size: 7px; line-height: 1.6; margin-top: 6px; letter-spacing: 0; }
+#btnNextLevel { background: #c9a227; color: #1a2a10; box-shadow: inset 0 2px 0 #ffe28a, 3px 3px 0 #0a1a0e; }
+#btnNextLevel:hover { background: #d4b338; }
+.hidden { display: none !important; }
